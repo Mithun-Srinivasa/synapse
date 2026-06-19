@@ -703,7 +703,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
       if (direction === 'back') {
         canvas.sendObjectToBack(active);
       } else if (direction === 'backward') {
-        canvas.sendObjectBackward(active);
+        canvas.sendObjectBackwards(active);
       } else if (direction === 'forward') {
         canvas.bringObjectForward(active);
       } else if (direction === 'front') {

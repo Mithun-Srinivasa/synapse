@@ -70,7 +70,7 @@ export async function applyMutation(
       if (direction === 'back') {
         canvas.sendObjectToBack(obj);
       } else if (direction === 'backward') {
-        canvas.sendObjectBackward(obj);
+        canvas.sendObjectBackwards(obj);
       } else if (direction === 'forward') {
         canvas.bringObjectForward(obj);
       } else if (direction === 'front') {
