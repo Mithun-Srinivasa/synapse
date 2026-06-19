@@ -204,7 +204,7 @@ export default function HomePage() {
             // Gradient text styling in light mode
             background: theme === 'light'
               ? 'linear-gradient(135deg, #C9A800 0%, #E87A4A 100%)'
-              : 'var(--color-accent)',
+              : 'transparent',
             WebkitBackgroundClip: theme === 'light' ? 'text' : 'initial',
             WebkitTextFillColor: theme === 'light' ? 'transparent' : 'initial',
             color: theme === 'light' ? 'transparent' : 'var(--color-accent)',
