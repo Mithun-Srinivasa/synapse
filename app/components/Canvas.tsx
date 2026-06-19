@@ -53,6 +53,10 @@ export interface CanvasHandle {
   changeSelectedStickyTextColor: (textColor: string) => void;
   /** Reorder the selected object(s) in the z-index stack. */
   layerSelected: (direction: 'back' | 'backward' | 'forward' | 'front') => void;
+  /** Toggle lock status of a specific object by its ID. */
+  toggleLock: (id: string) => void;
+  /** Programmatically select an object by its ID. */
+  selectObject: (id: string) => void;
 }
 
 export interface CanvasProps {
@@ -61,6 +65,7 @@ export interface CanvasProps {
   stickyColor: string;
   onToolChange: (tool: Tool) => void;
   onHistoryChange: (canUndo: boolean, canRedo: boolean) => void;
+  onLayersChange?: (layers: any[]) => void;
   onSelectionChange?: (
     hasSelection: boolean,
     metadata: { type: string | null; fontSize?: number | null; fill?: string | null } | null
@@ -238,7 +243,12 @@ const CLICK_DEFAULTS = {
 // ----------------------------------------------------------------
 // Extra serialization keys we want preserved in history snapshots
 // ----------------------------------------------------------------
-const EXTRA_PROPS = ['id', 'subtype', 'interactive', 'subTargetCheck', 'paddingX', 'paddingY', 'hoverCursor', 'selectionColor', 'cursorColor', 'perPixelTargetFind'];
+const EXTRA_PROPS = [
+  'id', 'subtype', 'interactive', 'subTargetCheck', 'paddingX', 'paddingY',
+  'hoverCursor', 'selectionColor', 'cursorColor', 'perPixelTargetFind',
+  'locked', 'lockMovementX', 'lockMovementY', 'lockScalingX', 'lockScalingY',
+  'lockRotation', 'selectable', 'evented', 'hasControls'
+];
 
 // ----------------------------------------------------------------
 // Component
@@ -249,6 +259,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
   stickyColor,
   onToolChange,
   onHistoryChange,
+  onLayersChange,
   onSelectionChange,
   undoRef,
   redoRef,
@@ -301,6 +312,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
   const onCursorClickRef = useRef(onCursorClick);
   const onViewportChangeRef = useRef(onViewportChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onLayersChangeRef = useRef(onLayersChange);
   const textSizeRef = useRef(textSize);
   const textColorRef = useRef(textColor);
   const themeRef = useRef(theme);
@@ -320,6 +332,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
   useEffect(() => { onCursorClickRef.current = onCursorClick; }, [onCursorClick]);
   useEffect(() => { onViewportChangeRef.current = onViewportChange; }, [onViewportChange]);
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
+  useEffect(() => { onLayersChangeRef.current = onLayersChange; }, [onLayersChange]);
 
   // UI state
   const [hasSelection, setHasSelection] = useState(false);
@@ -339,6 +352,46 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
   const updateCount = useCallback((canvas: any) => {
     setObjectCount(canvas.getObjects().length);
   }, []);
+
+  const getLayersList = useCallback((canvas: any) => {
+    if (!canvas) return [];
+    const activeObjects = canvas.getActiveObjects();
+    return canvas.getObjects()
+      .filter((obj: any) => obj.id && obj.subtype !== 'cursor' && obj.type !== 'activeSelection')
+      .map((obj: any) => {
+        let textVal = '';
+        if (obj.text !== undefined) {
+          textVal = obj.text;
+        }
+
+        let colorVal = '';
+        if (obj.subtype === 'sticky') {
+          colorVal = obj.backgroundColor || '';
+        } else if (obj.type === 'rect' || obj.type === 'circle') {
+          colorVal = obj.stroke || '';
+        } else if (obj.type === 'textbox') {
+          colorVal = obj.fill || '';
+        } else if (obj.subtype === 'arrow') {
+          colorVal = obj.stroke || '';
+        }
+
+        return {
+          id: obj.id,
+          type: obj.type,
+          subtype: obj.subtype,
+          text: textVal,
+          color: colorVal,
+          locked: !!obj.locked,
+          active: activeObjects.includes(obj),
+        };
+      })
+      .reverse();
+  }, []);
+
+  const triggerLayersChange = useCallback((canvas: any) => {
+    if (!canvas || !onLayersChangeRef.current) return;
+    onLayersChangeRef.current(getLayersList(canvas));
+  }, [getLayersList]);
 
   const notifyHistory = useCallback(() => {
     const h = historyRef.current;
@@ -451,8 +504,9 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
       }
       // Restore tool mode selectability
       const tool = activeToolRef.current;
-      obj.selectable = tool === 'select';
-      obj.evented    = tool === 'select';
+      const isLocked = !!obj.locked;
+      obj.selectable = tool === 'select' && !isLocked;
+      obj.evented    = tool === 'select' && !isLocked;
     });
 
     canvas.renderAll();
@@ -460,11 +514,12 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
     updateElevationShadows(canvas);
     updateCount(canvas);
     notifyHistory();
+    triggerLayersChange(canvas);
 
     if (centerViewport && bounds) {
       centerOnBounds(bounds);
     }
-  }, [updateCount, notifyHistory, centerOnBounds]);
+  }, [updateCount, notifyHistory, centerOnBounds, triggerLayersChange]);
 
   const updateElevationShadows = useCallback((canvas: any) => {
     if (!canvas || !fabricModule) return;
@@ -641,6 +696,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
       updateCount(canvas);
       isRestoringRef.current = false;
       updateElevationShadows(canvas);
+      triggerLayersChange(canvas);
     },
     getSnapshot() {
       const canvas = fabricRef.current;
@@ -716,6 +772,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
 
       // Notify selection change to update HUD layer indicator!
       onSelectionChangeRef.current?.(true, getActiveMetadata(canvas));
+      triggerLayersChange(canvas);
 
       // Broadcast layering mutation!
       if (active.id && !isRestoringRef.current) {
@@ -803,7 +860,54 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
         }
       }
     },
-  }), [restoreFromSnapshot, updateCount, roomId]);
+    toggleLock(id: string) {
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+      const obj = canvas.getObjects().find((o: any) => o.id === id);
+      if (!obj) return;
+
+      const newLockState = !obj.locked;
+      obj.set({ locked: newLockState });
+
+      obj.set({
+        lockMovementX: newLockState,
+        lockMovementY: newLockState,
+        lockScalingX: newLockState,
+        lockScalingY: newLockState,
+        lockRotation: newLockState,
+        selectable: !newLockState && activeToolRef.current === 'select',
+        evented: !newLockState && activeToolRef.current === 'select',
+        hasControls: !newLockState,
+      });
+
+      if (newLockState && canvas.getActiveObjects().includes(obj)) {
+        canvas.discardActiveObject();
+      }
+
+      canvas.renderAll();
+      updateElevationShadows(canvas);
+      saveHistory();
+
+      // Emit object:modified mutation
+      if (obj.id && !isRestoringRef.current) {
+        onMutationRef.current?.(buildMutation('object:modified', obj, userIdRef.current));
+      }
+
+      triggerLayersChange(canvas);
+      onSelectionChangeRef.current?.(canvas.getActiveObjects().length > 0, getActiveMetadata(canvas));
+    },
+    selectObject(id: string) {
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+      const obj = canvas.getObjects().find((o: any) => o.id === id);
+      if (obj) {
+        canvas.setActiveObject(obj);
+        canvas.renderAll();
+        onSelectionChangeRef.current?.(true, getActiveMetadata(canvas));
+        triggerLayersChange(canvas);
+      }
+    },
+  }), [restoreFromSnapshot, updateCount, roomId, triggerLayersChange]);
 
   // ----------------------------------------------------------------
   // Tool mode -- what the canvas interaction state should be
@@ -820,8 +924,9 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
     canvas.hoverCursor   = panning ? 'grab' : (tool === 'select' ? 'move'    : 'crosshair');
     canvas.forEachObject((obj: any) => {
       if (obj.isEditing) return; // Skip currently editing text objects to preserve Fabric's state
-      obj.selectable = !panning && tool === 'select';
-      obj.evented    = !panning && tool === 'select';
+      const isLocked = !!obj.locked;
+      obj.selectable = !panning && tool === 'select' && !isLocked;
+      obj.evented    = !panning && tool === 'select' && !isLocked;
     });
     canvas.renderAll();
     setIsPanActive(panning);
@@ -1340,14 +1445,17 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
       canvas.on('selection:created', () => {
         setHasSelection(true);
         onSelectionChangeRef.current?.(true, getActiveMetadata(canvas));
+        triggerLayersChange(canvas);
       });
       canvas.on('selection:updated', () => {
         setHasSelection(true);
         onSelectionChangeRef.current?.(true, getActiveMetadata(canvas));
+        triggerLayersChange(canvas);
       });
       canvas.on('selection:cleared', () => {
         setHasSelection(false);
         onSelectionChangeRef.current?.(false, null);
+        triggerLayersChange(canvas);
       });
       canvas.on('object:removed', (opt: any) => {
         setHasSelection(false);
@@ -1364,6 +1472,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
         if (!isRestoringRef.current) {
           updateElevationShadows(canvas);
         }
+        triggerLayersChange(canvas);
       });
 
       // Save history after move / resize (fires on mouse:up)
@@ -1398,6 +1507,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
             onMutationRef.current?.(buildMutation('object:modified', obj, userIdRef.current));
           }
         }
+        triggerLayersChange(canvas);
       });
 
       // Track which object IDs we have already broadcast as 'added' so that
@@ -1416,6 +1526,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
         broadcastedIds.add(obj.id);
         onMutationRef.current?.(buildMutation('object:added', obj, userIdRef.current));
         updateElevationShadows(canvas);
+        triggerLayersChange(canvas);
       });
 
 
@@ -1446,6 +1557,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
 
       canvas.on('text:changed', (opt: any) => {
         const obj = opt.target;
+        triggerLayersChange(canvas);
         if (obj && obj.id && !isRestoringRef.current) {
           if (textDebounceRef.current) clearTimeout(textDebounceRef.current);
           textDebounceRef.current = setTimeout(() => {
@@ -1472,6 +1584,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
           onMutationRef.current?.(buildMutation('object:modified', obj, userIdRef.current));
         }
         revertToSelectRef.current();
+        triggerLayersChange(canvas);
       });
 
       applyToolModeRef.current(canvas, activeToolRef.current);
@@ -1557,7 +1670,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const canvas = fabricRef.current;
         if (!canvas) return;
-        const active = canvas.getActiveObjects();
+        const active = canvas.getActiveObjects().filter((obj: any) => !obj.locked);
         if (active.length > 0) {
           active.forEach((obj: any) => canvas.remove(obj));
           canvas.discardActiveObject();

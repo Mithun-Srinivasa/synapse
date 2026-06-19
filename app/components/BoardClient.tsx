@@ -95,6 +95,8 @@ export default function BoardClient({ roomId }: BoardClientProps) {
   const [stickyTextColor, setStickyTextColor] = useState<string>('#1a1500');
   const [copied,         setCopied]         = useState(false);
   const [showToast,      setShowToast]      = useState(false);
+  const [layers,             setLayers]             = useState<any[]>([]);
+  const [isLayersPanelOpen,  setIsLayersPanelOpen]  = useState(false);
 
   // Load saved theme on mount
   useEffect(() => {
@@ -159,6 +161,11 @@ export default function BoardClient({ roomId }: BoardClientProps) {
       t: 'text',      T: 'text',
     };
 
+    if (e.key === 'l' || e.key === 'L') {
+      setIsLayersPanelOpen(prev => !prev);
+      return;
+    }
+
     if (e.key in shortcuts) setActiveTool(shortcuts[e.key]);
     if (e.key === 'Escape')  setActiveTool('select');
   }, []);
@@ -195,6 +202,10 @@ export default function BoardClient({ roomId }: BoardClientProps) {
     if (metadata?.type === 'sticky' && metadata?.fill) {
       setStickyTextColor(metadata.fill);
     }
+  }, []);
+
+  const handleLayersChange = useCallback((layersList: any[]) => {
+    setLayers(layersList);
   }, []);
 
   const handleColorChange = useCallback((color: string) => {
@@ -447,6 +458,7 @@ export default function BoardClient({ roomId }: BoardClientProps) {
           stickyColor={drawingColor}
           onToolChange={setActiveTool}
           onHistoryChange={handleHistoryChange}
+          onLayersChange={handleLayersChange}
           onSelectionChange={handleSelectionChange}
           undoRef={undoRef}
           redoRef={redoRef}
@@ -469,6 +481,96 @@ export default function BoardClient({ roomId }: BoardClientProps) {
           viewport={viewport}
         />
 
+        {/* Right-Side Layers Panel */}
+        <div className={`layers-panel${isLayersPanelOpen ? '' : ' closed'}`}>
+          <div className="layers-panel-header">
+            <span className="layers-panel-title">Layers</span>
+            <button
+              className="layers-panel-close-btn"
+              onClick={() => setIsLayersPanelOpen(false)}
+              title="Close Panel"
+              aria-label="Close layers panel"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="layers-list">
+            {layers.length === 0 ? (
+              <div className="layers-empty-state">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                  <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+                </svg>
+                <span>No layers created yet. Add shapes to start organizing.</span>
+              </div>
+            ) : (
+              layers.map((layer) => {
+                let label = 'Shape';
+                let iconText = '▢';
+                if (layer.type === 'rect') {
+                  label = 'Rectangle';
+                  iconText = '▢';
+                } else if (layer.type === 'circle') {
+                  label = 'Circle';
+                  iconText = '◯';
+                } else if (layer.subtype === 'sticky') {
+                  label = 'Sticky Note';
+                  iconText = '🗂';
+                } else if (layer.type === 'textbox') {
+                  label = 'Text';
+                  iconText = 'T';
+                } else if (layer.subtype === 'arrow') {
+                  label = 'Arrow';
+                  iconText = '↗';
+                }
+
+                return (
+                  <div
+                    key={layer.id}
+                    className={`layer-item-row${layer.active ? ' active' : ''}${layer.locked ? ' locked' : ''}`}
+                    onClick={() => canvasRef.current?.selectObject(layer.id)}
+                  >
+                    <span className="layer-icon" style={layer.color ? { color: layer.color } : {}}>
+                      {iconText}
+                    </span>
+                    <div className="layer-label-container">
+                      <span className="layer-name">{label}</span>
+                      {layer.text && (
+                        <span className="layer-text-preview">
+                          {layer.text.length > 18 ? layer.text.slice(0, 16) + '...' : layer.text}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      className={`layer-lock-btn${layer.locked ? ' locked' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        canvasRef.current?.toggleLock(layer.id);
+                      }}
+                      title={layer.locked ? 'Unlock Layer' : 'Lock Layer'}
+                      aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
+                    >
+                      {layer.locked ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                        </svg>
+                      ) : (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
+                          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
         {/* ---- Bottom floating HUD ----------------------------------------- */}
         <div style={{
           position: 'absolute',
@@ -482,6 +584,23 @@ export default function BoardClient({ roomId }: BoardClientProps) {
           flexWrap: 'wrap',
           justifyContent: 'center',
         }}>
+
+          {/* Layers panel toggle */}
+          <div className="hud-bar" role="group">
+            <button
+              className={`layer-btn layers-toggle-hud-btn${isLayersPanelOpen ? ' active' : ''}`}
+              onClick={() => setIsLayersPanelOpen(!isLayersPanelOpen)}
+              title="Layers List (L)"
+              aria-label="Toggle Layers Panel"
+              aria-pressed={isLayersPanelOpen}
+              style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.75} width="15" height="15" style={{ marginRight: 4 }}>
+                <path d="M3 6l7-3 7 3-7 3-7-3zM3 10l7 3 7-3M3 14l7 3 7-3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hud-label" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: 'inherit' }}>Layers</span>
+            </button>
+          </div>
 
           {/* Color picker pill — shown for all tools except pan */}
           {activeTool !== 'pan' && (

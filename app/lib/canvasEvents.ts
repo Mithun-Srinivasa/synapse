@@ -16,6 +16,8 @@ const EXTRA_PROPS = [
   'id', 'subtype', 'interactive', 'subTargetCheck',
   'paddingX', 'paddingY', 'hoverCursor', 'selectionColor', 'cursorColor',
   'perPixelTargetFind',
+  'locked', 'lockMovementX', 'lockMovementY', 'lockScalingX', 'lockScalingY',
+  'lockRotation', 'selectable', 'evented', 'hasControls'
 ];
 
 // ----------------------------------------------------------------
