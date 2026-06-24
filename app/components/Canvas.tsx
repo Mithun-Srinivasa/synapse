@@ -580,78 +580,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
     };
   }, []);
 
-  const drawLayerBadge = useCallback((canvas: any, ctx: CanvasRenderingContext2D) => {
-    if (!canvas || !fabricModule) return;
-    const fabric = fabricModule;
-    const activeObj = canvas.getActiveObject();
-    if (!activeObj || activeObj.type === 'activeSelection' || !activeObj.selectable) return;
 
-    const objects = canvas.getObjects().filter((o: any) => o.selectable && o.id && o.subtype !== 'cursor');
-    const total = objects.length;
-    const rank = objects.indexOf(activeObj) + 1;
-    if (rank <= 0) return;
-
-    // Find top center of object in canvas space
-    const coords = activeObj.getCoords();
-    if (!coords || coords.length < 2) return;
-    const tl = coords[0];
-    const tr = coords[1];
-    const topCenterX = (tl.x + tr.x) / 2;
-    const topCenterY = (tl.y + tr.y) / 2;
-
-    // Transform to viewport space (screen pixels)
-    const screenPt = fabric.util.transformPoint(
-      new fabric.Point(topCenterX, topCenterY),
-      canvas.viewportTransform
-    );
-
-    // Float 18px above the top border
-    const badgeY = screenPt.y - 18;
-    const badgeX = screenPt.x;
-
-    ctx.save();
-    // Reset context transform to draw badge in crisp screen space
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    // Badge content
-    const text = `LAYER ${rank} OF ${total}`;
-    ctx.font = 'bold 9px Inter, sans-serif';
-    const textWidth = ctx.measureText(text).width;
-
-    const paddingX = 8;
-    const paddingY = 4;
-    const w = textWidth + paddingX * 2;
-    const h = 18;
-    const rx = 9; // fully rounded pill
-
-    const x = badgeX - w / 2;
-    const y = badgeY - h / 2;
-
-    // Draw shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 2;
-
-    // Draw background pill
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, rx);
-    ctx.fillStyle = themeRef.current === 'dark' ? '#181824' : '#ffffff';
-    ctx.fill();
-
-    // Draw border
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = themeRef.current === 'dark' ? 'rgba(232, 197, 71, 0.6)' : 'rgba(201, 168, 0, 0.6)';
-    ctx.stroke();
-
-    // Draw text
-    ctx.fillStyle = themeRef.current === 'dark' ? '#E8C547' : '#9a7e00';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, badgeX, badgeY + 0.5);
-
-    ctx.restore();
-  }, []);
 
   // ----------------------------------------------------------------
   // Undo / Redo -- called from BoardClient via stable callbacks
@@ -1597,12 +1526,6 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
         const vpt = canvas.viewportTransform;
         if (vpt) {
           onViewportChangeRef.current?.(canvas.getZoom(), vpt[4], vpt[5]);
-        }
-
-        // Draw dynamic z-index / layer indicator badge (Option B)
-        const ctx = opt.ctx;
-        if (ctx) {
-          drawLayerBadge(canvas, ctx);
         }
       });
 

@@ -88,8 +88,6 @@ export default function BoardClient({ roomId }: BoardClientProps) {
   const [peerCount,      setPeerCount]      = useState(0);
   const [hasSelection,   setHasSelection]   = useState(false);
   const [selectedType,   setSelectedType]   = useState<string | null>(null);
-  const [layerRank,      setLayerRank]      = useState<number | undefined>(undefined);
-  const [layerTotal,     setLayerTotal]     = useState<number | undefined>(undefined);
   const [theme,          setTheme]          = useState<'light' | 'dark'>('dark');
   const [textSize,       setTextSize]       = useState<'small' | 'medium' | 'large'>('small');
   const [stickyTextColor, setStickyTextColor] = useState<string>('#1a1500');
@@ -183,14 +181,10 @@ export default function BoardClient({ roomId }: BoardClientProps) {
       type: string | null;
       fontSize?: number | null;
       fill?: string | null;
-      layerRank?: number;
-      layerTotal?: number;
     } | null
   ) => {
     setHasSelection(hasSel);
     setSelectedType(metadata ? metadata.type : null);
-    setLayerRank(metadata?.layerRank);
-    setLayerTotal(metadata?.layerTotal);
 
     if (metadata?.fontSize) {
       const fs = metadata.fontSize;
@@ -586,21 +580,27 @@ export default function BoardClient({ roomId }: BoardClientProps) {
         }}>
 
           {/* Layers panel toggle */}
-          <div className="hud-bar" role="group">
-            <button
-              className={`layer-btn layers-toggle-hud-btn${isLayersPanelOpen ? ' active' : ''}`}
-              onClick={() => setIsLayersPanelOpen(!isLayersPanelOpen)}
-              title="Layers List (L)"
-              aria-label="Toggle Layers Panel"
-              aria-pressed={isLayersPanelOpen}
-              style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.75} width="15" height="15" style={{ marginRight: 4 }}>
-                <path d="M3 6l7-3 7 3-7 3-7-3zM3 10l7 3 7-3M3 14l7 3 7-3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="hud-label" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: 'inherit' }}>Layers</span>
-            </button>
-          </div>
+          <button
+            className={`hud-bar layers-toggle-hud-btn${isLayersPanelOpen ? ' active' : ''}`}
+            onClick={() => setIsLayersPanelOpen(!isLayersPanelOpen)}
+            title="Layers List (L)"
+            aria-label="Toggle Layers Panel"
+            aria-pressed={isLayersPanelOpen}
+            style={{
+              cursor: 'pointer',
+              padding: '6px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '36px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.75} width="14" height="14" style={{ marginRight: 6 }}>
+              <path d="M3 6l7-3 7 3-7 3-7-3zM3 10l7 3 7-3M3 14l7 3 7-3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="hud-label" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'inherit', padding: 0 }}>Layers</span>
+          </button>
 
           {/* Color picker pill — shown for all tools except pan */}
           {activeTool !== 'pan' && (
@@ -626,7 +626,7 @@ export default function BoardClient({ roomId }: BoardClientProps) {
           {hasSelection && (
             <div className="hud-bar" role="group" aria-label="Layering">
               <span className="hud-label">
-                Layers {layerRank !== undefined && layerTotal !== undefined && `(${layerRank}/${layerTotal})`}
+                Layers
               </span>
               <div className="hud-divider" />
               <button

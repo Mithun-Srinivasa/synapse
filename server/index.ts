@@ -15,11 +15,30 @@ import { scheduleRedisSave } from './debounce';
 const PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:3000';
 
+// Parse comma-separated list of origins
+const allowedOrigins = CLIENT_ORIGIN.split(',').map((o) => o.trim());
+
+// Helper function to validate origin
+const checkOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (!origin) {
+    return callback(null, true);
+  }
+  if (
+    allowedOrigins.includes('*') ||
+    allowedOrigins.includes(origin) ||
+    origin === 'http://localhost:3000' ||
+    (origin.startsWith('https://synapse-') && origin.endsWith('.vercel.app'))
+  ) {
+    return callback(null, true);
+  }
+  return callback(null, false);
+};
+
 // ----------------------------------------------------------------
 // Express + HTTP
 // ----------------------------------------------------------------
 const app = express();
-app.use(cors({ origin: CLIENT_ORIGIN }));
+app.use(cors({ origin: checkOrigin }));
 app.use(express.json());
 
 // Health check endpoint
@@ -34,7 +53,7 @@ const httpServer = http.createServer(app);
 // ----------------------------------------------------------------
 const io = new Server(httpServer, {
   cors: {
-    origin: CLIENT_ORIGIN,
+    origin: checkOrigin,
     methods: ['GET', 'POST'],
   },
 });

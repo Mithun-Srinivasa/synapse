@@ -1192,10 +1192,30 @@ textarea[data-fabric="textarea"],
 
 .layers-toggle-hud-btn {
   position: relative;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-spring),
+    border-color var(--transition-fast);
+}
+
+.layers-toggle-hud-btn:hover {
+  background: var(--color-surface-hover) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border) !important;
+}
+
+.layers-toggle-hud-btn:active {
+  transform: scale(0.98);
 }
 
 .layers-toggle-hud-btn.active {
   background: var(--color-accent-faint) !important;
   color: var(--color-accent) !important;
   border-color: var(--color-accent-dim) !important;
+}
+
+.layers-toggle-hud-btn.active:hover {
+  background: var(--color-accent-faint) !important;
+  opacity: 0.9;
 }
