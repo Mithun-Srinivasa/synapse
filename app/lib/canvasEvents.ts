@@ -96,7 +96,8 @@ export async function applyMutation(
   if (type === 'object:modified') {
     const obj = canvas.getObjects().find((o: any) => o.id === objectId);
     if (obj) {
-      const { type: _type, ...cleanData } = data;
+      const cleanData = { ...data };
+      delete (cleanData as any).type;
       obj.set(cleanData as any);
       obj.setCoords();
       canvas.renderAll();

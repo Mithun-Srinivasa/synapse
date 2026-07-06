@@ -1522,7 +1522,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas({
         onCursorLeaveRef.current?.();
       });
 
-      canvas.on('after:render', (opt: any) => {
+      canvas.on('after:render', () => {
         const vpt = canvas.viewportTransform;
         if (vpt) {
           onViewportChangeRef.current?.(canvas.getZoom(), vpt[4], vpt[5]);
