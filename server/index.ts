@@ -11,6 +11,7 @@ import { Server, type Socket } from 'socket.io';
 import { joinRoom, leaveRoom, setSnapshot, hasRoom } from './rooms';
 import { getPersistedSnapshot } from './redis';
 import { scheduleRedisSave } from './debounce';
+import { handleAiPrompt, loadRoomChatHistory, cleanupRoomAi, getRoomChatHistory } from './aiHandler';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:3000';
@@ -111,6 +112,9 @@ io.on('connection', (socket: Socket) => {
       }
     }
 
+    // Load persisted chat history for AI (if not already in memory)
+    await loadRoomChatHistory(roomId);
+
     const { snapshot, memberCount } = joinRoom(roomId, socket);
 
     // Notify other members in the room that a new peer joined
@@ -118,6 +122,13 @@ io.on('connection', (socket: Socket) => {
 
     // Send existing canvas state and peer count (excluding self) to the joining client
     socket.emit('room:snapshot', { snapshot, peerCount: memberCount - 1 });
+
+    // Send existing chat history to the joining client
+    const chatHistory = getRoomChatHistory(roomId);
+    if (chatHistory.length > 0) {
+      socket.emit('ai_chat_history', { messages: chatHistory });
+    }
+
     console.log(`[socket] ${socket.id} → join_room "${roomId}" (user: ${userId}), snapshot=${snapshot ? 'yes' : 'null'}, peerCount=${memberCount - 1}`);
   });
 
@@ -162,6 +173,11 @@ io.on('connection', (socket: Socket) => {
     socket.to(roomId).emit('cursor:click', { userId, x, y });
   });
 
+  // ---- ai_prompt --------------------------------------------------
+  socket.on('ai_prompt', (payload: { message: string; mode: 'chat' | 'generate'; roomId: string; userId: string }) => {
+    handleAiPrompt(io, socket, payload);
+  });
+
   // ---- disconnect ------------------------------------------------
   socket.on('disconnect', (reason) => {
     const roomId = socketRooms.get(socket.id);
@@ -171,6 +187,11 @@ io.on('connection', (socket: Socket) => {
       socketRooms.delete(socket.id);
       socketUsers.delete(socket.id);
       io.to(roomId).emit('room:peer_left', { socketId: socket.id, userId });
+
+      // If room is now empty, clean up AI state (flush to Redis)
+      if (!hasRoom(roomId)) {
+        cleanupRoomAi(roomId).catch(() => {});
+      }
     }
     console.log(`[socket] disconnected: ${socket.id} (${reason})`);
   });

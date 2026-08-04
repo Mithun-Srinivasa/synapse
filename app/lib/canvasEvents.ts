@@ -12,7 +12,7 @@ export interface CanvasMutation {
 }
 
 // Extra Fabric properties to preserve across serialization
-const EXTRA_PROPS = [
+export const EXTRA_PROPS = [
   'id', 'subtype', 'interactive', 'subTargetCheck',
   'paddingX', 'paddingY', 'hoverCursor', 'selectionColor', 'cursorColor',
   'perPixelTargetFind',

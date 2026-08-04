@@ -6,7 +6,11 @@ import Canvas, { type CanvasHandle } from '@/components/Canvas';
 import { drawingColors } from '@/lib/design-tokens';
 import { connectToRoom, disconnectFromRoom, socket as getSocket } from '@/lib/socket';
 import type { CanvasMutation } from '@/lib/canvasEvents';
+import { EXTRA_PROPS } from '@/lib/canvasEvents';
 import LiveCursors from '@/components/LiveCursors';
+import AiPanel from '@/components/AiPanel';
+import type { AiCanvasOutput } from '@/lib/geminiTypes';
+import { hexToRgba } from '@/lib/document';
 
 interface BoardClientProps {
   roomId: string;
@@ -112,6 +116,9 @@ export default function BoardClient({ roomId }: BoardClientProps) {
   const [cursors, setCursors] = useState<Record<string, { x: number; y: number; color: string; isPointerDown?: boolean }>>({});
   const [clicks,  setClicks]  = useState<Array<{ id: string; x: number; y: number; color: string }>>([]);
   const [viewport, setViewport] = useState({ zoom: 1, panX: 0, panY: 0 });
+
+  // Mouse position for AI Eye tracking
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   // Stable refs wired to Canvas internals via callbacks
   const undoRef   = useRef<(() => void) | null>(null);
@@ -258,6 +265,152 @@ export default function BoardClient({ roomId }: BoardClientProps) {
 
   const handleViewportChange = useCallback((zoom: number, panX: number, panY: number) => {
     setViewport({ zoom, panX, panY });
+  }, []);
+
+  // ---- Mouse tracking for AI Eye ------------------------------------
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => setMousePosition({ x: e.clientX, y: e.clientY });
+    window.addEventListener('mousemove', onMouseMove);
+    return () => window.removeEventListener('mousemove', onMouseMove);
+  }, []);
+
+  // ---- AI Canvas Output Handler (Generate mode) ---------------------
+  // Bug 2 fix: Each client creates shapes locally from ai_canvas_output.
+  // No canvas:mutation emissions — all peers receive ai_canvas_output directly.
+  // Only a single canvas:snapshot is emitted for persistence.
+  const handleAiCanvasOutput = useCallback(async (output: AiCanvasOutput) => {
+    // Dynamically import fabric so it works with SSR
+    const fabric = await import('fabric');
+    // Bug 10 fix: Try canvasRef first, fall back to window.canvas
+    const canvas = (canvasRef.current as any)?.fabricCanvas ?? (window as any).canvas;
+    if (!canvas) return;
+
+    const uid = () => Math.random().toString(36).slice(2, 9);
+    const nodeColor = '#E8C547'; // accent color for AI-generated shapes
+
+    // Build a map of nodeId -> fabricId + center position for edge drawing
+    const nodeMap = new Map<string, { fabricId: string; cx: number; cy: number }>();
+
+    // Create shapes for each node
+    for (const node of output.nodes) {
+      const fabricId = uid();
+      let obj: any;
+
+      if (node.type === 'circle') {
+        const r = Math.min(node.width, node.height) / 2;
+        obj = new fabric.Circle({
+          left: node.x, top: node.y,
+          radius: r,
+          fill: hexToRgba(nodeColor, 0.06),
+          stroke: nodeColor,
+          strokeWidth: 2,
+          strokeUniform: true,
+          id: fabricId,
+        } as any);
+        nodeMap.set(node.id, { fabricId, cx: node.x + r, cy: node.y + r });
+      } else if (node.type === 'sticky') {
+        obj = new fabric.Textbox(node.label, {
+          left: node.x, top: node.y,
+          width: node.width - 24,
+          height: node.height - 24,
+          padding: 12,
+          backgroundColor: nodeColor,
+          fill: '#1a1500',
+          fontSize: 16,
+          fontFamily: 'Geist, Inter, sans-serif',
+          editable: true,
+          textAlign: 'left',
+          splitByGrapheme: true,
+          hoverCursor: 'move',
+          cursorColor: '#333',
+          selectionColor: 'rgba(0, 0, 0, 0.15)',
+          id: fabricId,
+          subtype: 'sticky',
+          shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.22)', blur: 14, offsetX: 0, offsetY: 6 }),
+        } as any);
+        nodeMap.set(node.id, { fabricId, cx: node.x + node.width / 2, cy: node.y + node.height / 2 });
+      } else {
+        // Default: box (rectangle)
+        obj = new fabric.Rect({
+          left: node.x, top: node.y,
+          width: node.width, height: node.height,
+          fill: hexToRgba(nodeColor, 0.06),
+          stroke: nodeColor,
+          strokeWidth: 2,
+          rx: 4, ry: 4,
+          strokeUniform: true,
+          id: fabricId,
+        } as any);
+        nodeMap.set(node.id, { fabricId, cx: node.x + node.width / 2, cy: node.y + node.height / 2 });
+      }
+
+      if (obj) {
+        canvas.add(obj);
+      }
+
+      // Add text label for non-sticky nodes (as a separate textbox positioned inside)
+      if (node.type !== 'sticky' && node.label) {
+        const labelId = uid();
+        const label = new fabric.Textbox(node.label, {
+          left: node.x + 8,
+          top: node.y + node.height / 2 - 8,
+          width: node.width - 16,
+          fontSize: 13,
+          fontFamily: 'Geist, Inter, sans-serif',
+          fill: nodeColor,
+          textAlign: 'center',
+          editable: false,
+          selectable: false,
+          evented: false,
+          id: labelId,
+        } as any);
+        canvas.add(label);
+      }
+    }
+
+    // Create arrows for edges using the existing Polyline arrow pattern
+    for (const edge of output.edges) {
+      const fromNode = nodeMap.get(edge.from);
+      const toNode = nodeMap.get(edge.to);
+      if (!fromNode || !toNode) continue;
+
+      const start = { x: fromNode.cx, y: fromNode.cy };
+      const end = { x: toNode.cx, y: toNode.cy };
+
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 5) continue;
+
+      const angle = Math.atan2(dy, dx);
+      const headLen = Math.min(18, len * 0.28);
+      const headAngle = Math.PI / 7;
+      const lx1 = end.x - headLen * Math.cos(angle - headAngle);
+      const ly1 = end.y - headLen * Math.sin(angle - headAngle);
+      const lx2 = end.x - headLen * Math.cos(angle + headAngle);
+      const ly2 = end.y - headLen * Math.sin(angle + headAngle);
+
+      const arrowId = uid();
+      const arrow = new fabric.Polyline(
+        [{ x: start.x, y: start.y }, { x: end.x, y: end.y },
+         { x: lx1, y: ly1 }, { x: end.x, y: end.y }, { x: lx2, y: ly2 }],
+        {
+          fill: 'transparent', stroke: nodeColor,
+          strokeWidth: 2, strokeLineCap: 'round', strokeLineJoin: 'round',
+          objectCaching: false, id: arrowId, subtype: 'arrow',
+          perPixelTargetFind: true,
+        } as any
+      );
+
+      canvas.add(arrow);
+    }
+
+    canvas.renderAll();
+
+    // Bug 9 fix: Use full EXTRA_PROPS for snapshot instead of hardcoded subset
+    const sock = getSocket();
+    const snapshot = JSON.stringify(canvas.toJSON(EXTRA_PROPS));
+    sock.emit('canvas:snapshot', { roomId: roomIdRef.current, snapshot });
   }, []);
 
   useEffect(() => {
@@ -473,6 +626,15 @@ export default function BoardClient({ roomId }: BoardClientProps) {
           cursors={cursors}
           clicks={clicks}
           viewport={viewport}
+        />
+
+        {/* AI Chat Panel */}
+        <AiPanel
+          roomId={roomId}
+          userId={userIdRef.current}
+          mousePosition={mousePosition}
+          viewport={viewport}
+          onCanvasOutput={handleAiCanvasOutput}
         />
 
         {/* Right-Side Layers Panel */}
