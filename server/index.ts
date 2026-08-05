@@ -199,10 +199,9 @@ io.on('connection', (socket: Socket) => {
 });
 
 // ----------------------------------------------------------------
-// Start
-// ----------------------------------------------------------------
-httpServer.listen(PORT, () => {
-  console.log(`\n🟢 Synapse server running at http://localhost:${PORT}`);
+const HOST = '0.0.0.0';
+httpServer.listen(PORT, HOST, () => {
+  console.log(`\n🟢 Synapse server running at http://${HOST}:${PORT}`);
   console.log(`   Accepting connections from: ${CLIENT_ORIGIN}\n`);
 });
 // Trigger reload
