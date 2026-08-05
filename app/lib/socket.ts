@@ -31,22 +31,32 @@ function getSocket(): Socket {
 /** Connect (or reconnect) and join a specific room. */
 export function connectToRoom(roomId: string, userId?: string): Socket {
   const socket = getSocket();
+
+  // Remove existing connect listeners to prevent duplicate handlers when switching rooms
+  socket.off('connect');
+
+  const doJoin = () => {
+    socket.emit('join_room', { roomId, userId });
+  };
+
+  // Re-join room on auto-reconnects
+  socket.on('connect', doJoin);
+
   if (!socket.connected) {
     socket.connect();
-  }
-  // After connect (or if already connected) emit join_room
-  const doJoin = () => socket.emit('join_room', { roomId, userId });
-  if (socket.connected) {
-    doJoin();
   } else {
-    socket.once('connect', doJoin);
+    doJoin();
   }
+
   return socket;
 }
 
 /** Leave the current room and disconnect cleanly. */
 export function disconnectFromRoom(): void {
-  _socket?.disconnect();
+  if (_socket) {
+    _socket.off('connect');
+    _socket.disconnect();
+  }
 }
 
 /** Expose the socket instance for event listeners. */

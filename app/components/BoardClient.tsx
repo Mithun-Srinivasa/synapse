@@ -549,7 +549,7 @@ export default function BoardClient({ roomId }: BoardClientProps) {
               )}
             </div>
             <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              {peerCount} online
+              {peerCount > 0 ? `${peerCount + 1} online` : 'Solo'}
             </span>
           </div>
         )}
