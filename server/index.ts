@@ -27,8 +27,9 @@ const checkOrigin = (origin: string | undefined, callback: (err: Error | null, a
   if (
     allowedOrigins.includes('*') ||
     allowedOrigins.includes(origin) ||
-    origin === 'http://localhost:3000' ||
-    (origin.startsWith('https://synapse-') && origin.endsWith('.vercel.app'))
+    origin.endsWith('.vercel.app') ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:')
   ) {
     return callback(null, true);
   }

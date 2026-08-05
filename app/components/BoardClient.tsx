@@ -90,6 +90,7 @@ export default function BoardClient({ roomId }: BoardClientProps) {
   const [canUndo,        setCanUndo]        = useState(false);
   const [canRedo,        setCanRedo]        = useState(false);
   const [peerCount,      setPeerCount]      = useState(0);
+  const [isConnected,    setIsConnected]    = useState(false);
   const [hasSelection,   setHasSelection]   = useState(false);
   const [selectedType,   setSelectedType]   = useState<string | null>(null);
   const [theme,          setTheme]          = useState<'light' | 'dark'>('dark');
@@ -471,8 +472,27 @@ export default function BoardClient({ roomId }: BoardClientProps) {
       }, 150);
     });
 
-    sock.on('connect',    () => console.log('[BoardClient] socket connected:', sock.id));
-    sock.on('disconnect', (r) => console.log('[BoardClient] socket disconnected:', r));
+    const onConnect = () => {
+      setIsConnected(true);
+      console.log('[BoardClient] socket connected:', sock.id);
+    };
+    const onDisconnect = (r: string) => {
+      setIsConnected(false);
+      console.log('[BoardClient] socket disconnected:', r);
+    };
+    const onConnectError = (err: Error) => {
+      setIsConnected(false);
+      console.warn('[BoardClient] socket connection error:', err.message);
+    };
+
+    sock.on('connect',       onConnect);
+    sock.on('disconnect',    onDisconnect);
+    sock.on('connect_error', onConnectError);
+
+    // If socket is already connected when listener attaches
+    if (sock.connected) {
+      setIsConnected(true);
+    }
 
     return () => {
       disconnectFromRoom();
@@ -483,8 +503,9 @@ export default function BoardClient({ roomId }: BoardClientProps) {
       sock.off('cursor:move');
       sock.off('cursor:leave');
       sock.off('cursor:click');
-      sock.off('connect');
-      sock.off('disconnect');
+      sock.off('connect',       onConnect);
+      sock.off('disconnect',    onDisconnect);
+      sock.off('connect_error', onConnectError);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
@@ -548,8 +569,8 @@ export default function BoardClient({ roomId }: BoardClientProps) {
                 </div>
               )}
             </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              {peerCount > 0 ? `${peerCount + 1} online` : 'Solo'}
+            <span style={{ fontSize: 11, color: isConnected ? 'var(--color-text-muted)' : '#ff4757', fontWeight: 600 }}>
+              {isConnected ? (peerCount > 0 ? `${peerCount + 1} online` : 'Solo') : 'Disconnected'}
             </span>
           </div>
         )}
