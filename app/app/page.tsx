@@ -13,13 +13,13 @@ function generateRoomId(): string {
 }
 
 const features = [
-  { text: 'Sticky notes, shapes & arrows', active: true,  icon: '✦' },
-  { text: 'Real-time multiplayer cursors',  active: true,  icon: '⬡' },
-  { text: 'AI-powered diagram generation', active: false, icon: '◈' },
-  { text: 'Live presence with cursors',    active: true,  icon: '◉' },
+  { text: 'Sticky notes, shapes & arrows', active: true, icon: '✦' },
+  { text: 'Real-time multiplayer cursors',  active: true, icon: '⬡' },
+  { text: 'AI-powered diagram generation', active: true, icon: '◈' },
+  { text: 'Shared AI chat with Gemini',    active: true, icon: '◉' },
 ];
 
-const stackItems = ['Next.js 15', 'Fabric.js 6', 'Socket.io 4', 'Gemini 2.5'];
+const stackItems = ['Next.js 16', 'Fabric.js 6', 'Socket.io 4', 'Gemini 3.5'];
 
 // Floating canvas shapes that drift in the background
 const SHAPES = [

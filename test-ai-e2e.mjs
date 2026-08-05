@@ -80,6 +80,7 @@ async function run() {
     await sleep(500);
     const panel = await page.$('.ai-panel');
     log('AI panel opens on click', !!panel);
+    await page.screenshot({ path: 'c:\\synapse\\test-empty-state.png' });
   } catch (e) {
     log('AI panel opens on click', false, e.message);
   }

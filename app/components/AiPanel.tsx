@@ -283,7 +283,59 @@ export default function AiPanel({ roomId, userId, mousePosition, viewport, onCan
             <div className="ai-chat-scroll" ref={scrollRef}>
               {messages.length === 0 ? (
                 <div className="ai-empty-state">
-                  Ask me anything, or switch to <strong>Generate</strong> mode to create diagrams on the canvas.
+                  <div className="ai-empty-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="ai-empty-title">
+                      {mode === 'chat' ? 'Whiteboard AI Assistant' : 'Canvas Diagram Generator'}
+                    </div>
+                    <div className="ai-empty-desc">
+                      {mode === 'chat'
+                        ? 'Ask questions, brainstorm ideas, or collaborate on your canvas.'
+                        : 'Describe a flowchart or diagram to generate shapes on the canvas.'}
+                    </div>
+                  </div>
+
+                  <div className="ai-empty-suggestions">
+                    {mode === 'chat' ? (
+                      <>
+                        <button
+                          type="button"
+                          className="ai-suggestion-chip"
+                          onClick={() => setInputValue('Suggest ideas for this canvas')}
+                        >
+                          <span>💡</span> Suggest ideas for this canvas
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-suggestion-chip"
+                          onClick={() => setInputValue('How can we structure our flowchart?')}
+                        >
+                          <span>📐</span> How can we structure our flowchart?
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="ai-suggestion-chip"
+                          onClick={() => setInputValue('User sign-up flow with 4 steps')}
+                        >
+                          <span>✨</span> User sign-up flow with 4 steps
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-suggestion-chip"
+                          onClick={() => setInputValue('Microservice architecture diagram')}
+                        >
+                          <span>⚡</span> Microservice architecture diagram
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ) : (
                 messages.map(msg => (
