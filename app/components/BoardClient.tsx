@@ -751,15 +751,16 @@ export default function BoardClient({ roomId }: BoardClientProps) {
         {/* ---- Bottom floating HUD ----------------------------------------- */}
         <div style={{
           position: 'absolute',
-          bottom: 36,
+          bottom: 24,
           left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex',
-          gap: 8,
+          gap: 6,
           alignItems: 'center',
-          zIndex: 20,
-          flexWrap: 'wrap',
+          zIndex: 25,
+          maxWidth: 'calc(100vw - 400px)',
           justifyContent: 'center',
+          pointerEvents: 'none',
         }}>
 
           {/* Layers panel toggle */}

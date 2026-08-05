@@ -368,6 +368,7 @@ body {
   -webkit-backdrop-filter: blur(var(--hud-blur)) saturate(var(--hud-saturate));
   border: 1px solid var(--color-border-focus);
   box-shadow: var(--shadow-glass);
+  pointer-events: auto;
 }
 
 .hud-label {

@@ -1,4 +1,4 @@
-// gemini.ts -- Gemini 2.5 Flash wrapper for Synapse AI chat
+// gemini.ts -- Gemini SDK wrapper with automatic model fallback
 // Phase 5: AI integration layer
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -12,6 +12,14 @@ if (apiKey) {
 } else {
   console.warn('⚠️ [Gemini] No GEMINI_API_KEY found. AI features disabled.');
 }
+
+// Priority list of models to try if the primary model is busy/rate-limited/503
+const FALLBACK_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+];
 
 // System prompts
 const CHAT_SYSTEM_PROMPT = `You are a collaborative thinking partner on a shared whiteboard. Two or more people are working together on this canvas. Keep responses concise (under 150 words unless asked for more). Be direct and useful. You can see the conversation history above. Do not mention that you are an AI.`;
@@ -39,9 +47,7 @@ export function isGeminiAvailable(): boolean {
 }
 
 /**
- * Stream a chat response. Yields text chunks as they arrive.
- * @param history - Previous conversation turns (max 10)
- * @param message - Current user message
+ * Stream a chat response. Tries fallback models if 503/429 occurs.
  */
 export async function* streamChatResponse(
   history: ChatHistoryEntry[],
@@ -49,35 +55,60 @@ export async function* streamChatResponse(
 ): AsyncGenerator<string> {
   if (!genAI) throw new Error('Gemini not initialized');
 
-  // systemInstruction must be passed to getGenerativeModel, not startChat
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash',
-    systemInstruction: CHAT_SYSTEM_PROMPT,
-  });
-  const chat = model.startChat({ history });
+  let lastError: unknown = null;
 
-  const result = await chat.sendMessageStream(message);
-  for await (const chunk of result.stream) {
-    const text = chunk.text();
-    if (text) yield text;
+  for (const modelName of FALLBACK_MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: CHAT_SYSTEM_PROMPT,
+      });
+      const chat = model.startChat({ history });
+      const result = await chat.sendMessageStream(message);
+
+      let chunkCount = 0;
+      for await (const chunk of result.stream) {
+        const text = chunk.text();
+        if (text) {
+          chunkCount++;
+          yield text;
+        }
+      }
+
+      if (chunkCount > 0) return; // Successfully streamed!
+    } catch (err) {
+      console.warn(`⚠️ [Gemini] Model "${modelName}" failed, trying fallback:`, err instanceof Error ? err.message : err);
+      lastError = err;
+    }
   }
+
+  throw lastError || new Error('All Gemini models failed');
 }
 
 /**
- * Generate a diagram (non-streaming, accumulates full response for JSON parsing).
- * Returns the raw text response from Gemini.
+ * Generate a diagram. Tries fallback models if 503/429 occurs.
  */
 export async function generateDiagram(
   message: string
 ): Promise<string> {
   if (!genAI) throw new Error('Gemini not initialized');
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash',
-    systemInstruction: GENERATE_SYSTEM_PROMPT,
-  });
-  const chat = model.startChat({ history: [] });
+  let lastError: unknown = null;
 
-  const result = await chat.sendMessage(message);
-  return result.response.text();
+  for (const modelName of FALLBACK_MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: GENERATE_SYSTEM_PROMPT,
+      });
+      const chat = model.startChat({ history: [] });
+      const result = await chat.sendMessage(message);
+      return result.response.text();
+    } catch (err) {
+      console.warn(`⚠️ [Gemini] Model "${modelName}" failed for generate, trying fallback:`, err instanceof Error ? err.message : err);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('All Gemini models failed for diagram generation');
 }

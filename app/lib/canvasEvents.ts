@@ -112,6 +112,17 @@ export async function applyMutation(
   }
 
   // object:added (or modified when not found locally -- treat as add)
+  // Prevent duplicates: if an object with this ID is already present on the canvas, update it in place.
+  const existingObj = canvas.getObjects().find((o: any) => o.id === objectId);
+  if (existingObj) {
+    const cleanData = { ...data };
+    delete (cleanData as any).type;
+    existingObj.set(cleanData as any);
+    existingObj.setCoords();
+    canvas.renderAll();
+    return true;
+  }
+
   try {
     const enlivedObjects: any[] = await new Promise((resolve, reject) => {
       (canvas.constructor as any).enlivenObjects(
