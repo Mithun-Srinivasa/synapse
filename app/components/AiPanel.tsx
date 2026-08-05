@@ -274,7 +274,7 @@ export default function AiPanel({ roomId, userId, mousePosition, viewport, onCan
             <div className="ai-panel-header">
               <div className="ai-panel-model">
                 <span className={`ai-panel-status-dot${isStreaming ? ' streaming' : ''}`} />
-                gemini-2.5-flash
+                gemini-3.5-flash
               </div>
               <span className="ai-panel-room">{roomId.slice(0, 8)}</span>
             </div>

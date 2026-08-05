@@ -49,11 +49,12 @@ export async function* streamChatResponse(
 ): AsyncGenerator<string> {
   if (!genAI) throw new Error('Gemini not initialized');
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const chat = model.startChat({
-    history,
+  // systemInstruction must be passed to getGenerativeModel, not startChat
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3.5-flash',
     systemInstruction: CHAT_SYSTEM_PROMPT,
   });
+  const chat = model.startChat({ history });
 
   const result = await chat.sendMessageStream(message);
   for await (const chunk of result.stream) {
@@ -71,11 +72,11 @@ export async function generateDiagram(
 ): Promise<string> {
   if (!genAI) throw new Error('Gemini not initialized');
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const chat = model.startChat({
-    history: [],
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3.5-flash',
     systemInstruction: GENERATE_SYSTEM_PROMPT,
   });
+  const chat = model.startChat({ history: [] });
 
   const result = await chat.sendMessage(message);
   return result.response.text();
