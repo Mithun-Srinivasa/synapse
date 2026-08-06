@@ -271,7 +271,7 @@ async function handleChatFlow(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error during AI response';
     console.error(`❌ [AI] Chat stream error in "${roomId}":`, err);
-    socket.emit('ai_error', { message: errorMessage });
+    io.to(roomId).emit('ai_error', { message: errorMessage });
   }
 }
 
@@ -341,7 +341,7 @@ async function handleGenerateFlow(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error during diagram generation';
     console.error(`❌ [AI] Generate error in "${roomId}":`, err);
-    socket.emit('ai_error', { message: errorMessage });
+    io.to(roomId).emit('ai_error', { message: errorMessage });
   }
 }
 

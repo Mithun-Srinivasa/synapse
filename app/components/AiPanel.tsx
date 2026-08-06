@@ -186,16 +186,18 @@ export default function AiPanel({ roomId, userId, mousePosition, viewport, onCan
     const onChatHistory = ({ messages: history }: {
       messages: Array<{ role: 'user' | 'assistant'; content: string; userId: string; timestamp: number }>;
     }) => {
-      // Bug 7 fix: Only apply history if local messages are empty (avoid overwriting
-      // messages from a reconnection scenario where new messages were added).
       setMessages(prev => {
-        if (prev.length > 0) return prev;
-        return history.map((m, i) => ({
+        const formattedHistory = history.map((m, i) => ({
           id: `hist-${i}-${m.timestamp}`,
           role: m.role,
           content: m.content,
           userId: m.userId,
         }));
+        if (prev.length === 0) return formattedHistory;
+        // Merge history turns with local messages without duplicates
+        const historyKeys = new Set(history.map(h => `${h.role}:${h.content.trim()}`));
+        const unmergedLocal = prev.filter(p => !historyKeys.has(`${p.role}:${p.content.trim()}`));
+        return [...formattedHistory, ...unmergedLocal];
       });
     };
 
